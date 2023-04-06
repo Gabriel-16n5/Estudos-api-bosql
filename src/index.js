@@ -33,18 +33,21 @@ app.get("/receitas/:id", (request, response) => {
 })
 
 app.post("/receitas", (req, res) => {
-    console.log(req.body)
-    const novaReceitas = [
+    if(!req.body.nome, !req.body.ingredientes, !req.body.descricao){
+        res.status(422).send("deu erro")
+        return
+    }
+    const novaReceitas = 
         {
             id: receitas.length + 1,
             nome: req.body.nome,
             ingredientes: req.body.ingredientes,
             descricao: req.body.descricao
         }
-    ]
+    
     receitas.push(novaReceitas);
 
-    res.send("receita adicionada");
+    res.sendStatus(201);
 })
 
 app.listen(4000, () => console.log("Ta rodando")) // normalmente não é porta fixa, geralmente de 3000 a 5999
