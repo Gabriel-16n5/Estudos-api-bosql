@@ -19,13 +19,28 @@ const receitas = [
 const app = express() // app do server
 app.use(cors());
 app.use(express.json())
-app.get("/receitas", (request, response) =>{
+app.get("/receitas", (req, res) => {
+    const {filter} = req.query
 
-    response.send(receitas)
+    if(filter){
+        const newList = receitas.filter(receita => receita.ingredientes.toLowerCase().includes(filter.toLowerCase()));
+        return res.send(newList)
+    }
+
+
+
+    res.send(receitas)
 })
+
 
 app.get("/receitas/:id", (request, response) => {
     const {id} = request.params
+    const {auth} = request.headers
+
+    if(auth !== "let"){
+        return response.sendStatus(401)
+    }
+
 
     const receita = receitas.find((item) => item.id === +id)
 
