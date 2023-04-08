@@ -19,12 +19,12 @@ const receitas = [
 const app = express() // app do server
 app.use(cors());
 app.use(express.json())
-app.get("/receitas", (req, res) => {
-    const {filter} = req.query
+app.get("/receitas", (request, response) => {
+    const {filter} = request.query
 
     if(filter){
         const newList = receitas.filter(receita => receita.ingredientes.toLowerCase().includes(filter.toLowerCase()));
-        return res.send(newList)
+        return response.send(newList)
     }
 
 
@@ -35,34 +35,39 @@ app.get("/receitas", (req, res) => {
 
 app.get("/receitas/:id", (request, response) => {
     const {id} = request.params
-    const {auth} = request.headers
+    // exemplo simples para entender headers//
+    const {auth} = request.headers;
 
-    if(auth !== "let"){
-        return response.sendStatus(401)
+    if(auth !== "Gabriel"){
+        return response.status(401).send("Acesso negado");
     }
 
 
     const receita = receitas.find((item) => item.id === +id)
 
+    if(!receita){
+        response.status(404).send("Receita não encontrada")
+    }
+
     response.send(receita)
 })
 
-app.post("/receitas", (req, res) => {
-    if(!req.body.nome, !req.body.ingredientes, !req.body.descricao){
-        res.status(422).send("deu erro")
+app.post("/receitas", (request, response) => {
+    if(!request.body.nome, !request.body.ingredientes, !request.body.descricao){
+        response.status(422).send("deu erro")
         return
     }
     const novaReceitas = 
         {
             id: receitas.length + 1,
-            nome: req.body.nome,
-            ingredientes: req.body.ingredientes,
-            descricao: req.body.descricao
+            nome: request.body.nome,
+            ingredientes: request.body.ingredientes,
+            descricao: request.body.descricao
         }
     
     receitas.push(novaReceitas);
 
-    res.sendStatus(201);
+    response.sendStatus(201);
 })
 
 app.listen(4000, () => console.log("Ta rodando")) // normalmente não é porta fixa, geralmente de 3000 a 5999
