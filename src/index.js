@@ -3,46 +3,20 @@ import cors from "cors";
 import { MongoClient } from "mongodb";
 import dotenv from "dotenv"
 
-const receitas = [
-    {
-        id: 1,
-        nome: "pipoca",
-        ingredientes: "milho",
-        descricao: "só fritar"
-    },
-    {
-        id: 2,
-        nome: "paçoca",
-        ingredientes: "mindurim",
-        descricao: "só socar"
-    }
-]
 
 const app = express() // app do server
 app.use(cors());
 app.use(express.json())
 dotenv.config()
 
-//teste de implementar relacionamento com banco de dados mongo
+
 let db;
 const mongoCLient = new MongoClient(process.env.DATABASE_URL)
 mongoCLient.connect()
 .then(() => db = mongoCLient.db())
 .catch((erro) => console.log(erro.message))
 
-// app.get("/herois", (request, response) => {
-//     db.collection("herois").find().toArray()
-//     .then((resposta) => response.send(resposta))
-//     .catch((erro) => response.status(500).send(erro.message))
-// })
-//
 app.get("/receitas", (request, response) => {
-    // const {filter} = request.query
-    // if(filter){
-    //     const newList = receitas.filter(receita => receita.ingredientes.toLowerCase().includes(filter.toLowerCase()));
-    //     return response.send(newList)
-    // }
-    // res.send(receitas)
     db.collection("receitas").find().toArray()
     .then(lst => response.send(lst) )
     .catch((erro) => response.send(erro.message).status(500))
@@ -69,10 +43,6 @@ app.get("/receitas/:id", (request, response) => {
 })
 
 app.post("/receitas", (request, response) => {
-    // if(!request.body.nome, !request.body.ingredientes, !request.body.descricao){
-    //     response.status(422).send("deu erro")
-    //     return
-    // }
     const novaReceitas = 
         {
             nome: request.body.nome,
