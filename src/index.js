@@ -2,7 +2,7 @@ import express, { response } from "express";
 import cors from "cors";
 import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv"
-
+import joi from "joi"
 
 const app = express() // Criação do app do server
 
@@ -39,9 +39,7 @@ app.get("/receitas/:id", async (request, response) => {
 
     try{
         const result = await db.collection("receitas").findOne({ _id: new ObjectId(id) });
-        if(!result) {
-            return response.status(404).send("Receita não encontrada")
-        }
+        if(!result) {return response.status(404).send("Receita não encontrada")}
         response.send(result)
     } catch (erro) {
         response.status(500).send(erro.message)
@@ -51,16 +49,22 @@ app.get("/receitas/:id", async (request, response) => {
 
 app.post("/receitas", async (request, response) => {
     const {nome, ingredientes, descricao} = request.body;
-    const novaReceitas = {}
-    if(nome) novaReceitas.nome = nome;
-    if(ingredientes) novaReceitas.ingredientes = ingredientes;
-    if(descricao) novaReceitas.descricao = descricao;
     
+    const receitaSchema = joi.object({
+        nome: joi.string().required(),
+        ingredientes: joi.string().required(),
+        descricao: joi.string().required()
+    })
+
+    const validation = receitaSchema.validate(request.body, {abortEarly: false});
+
+    if(validation.error) return response.status(422).send(validation.error.details);
+
     try{
         const recipe = await db.collection("receitas").findOne({nome: nome})
         if(recipe) return response.status(409).send("receita já existente")
 
-        await db.collection("receitas").insertOne(novaReceitas)
+        await db.collection("receitas").insertOne(request.body)
         response.status(201).send("Receita criada com sucesso")
     } catch (erro) {
         response.status(500).send(erro.message)
@@ -83,7 +87,7 @@ app.delete("/receitas/:id", async (request, response) => {
 app.delete("/receitas/muitas/:filtroIngredientes", async (request, response) => {
     const {filtroIngredientes} = request.params;
     try{
-       const result = await db.collection("receitas").deleteMany({ ingredientes: filtroIngredientes});
+       const result = await db.collection("receitas").deleteMany({ingredientes: {$regex: filtroIngredientes, $options: "i"}});
        if (result.deletedCount === 0) return response.status(404).send("Não existe nem uma receita com esse ingrediente")
         response.status(200).send("deletado")
     }
@@ -97,15 +101,20 @@ app.put("/receitas/:id", async (request, response) => {
     const {id} = request.params;
     const {nome, ingredientes, descricao} = request.body;
 
-    const receitaEditada = {}
-    if(nome) receitaEditada.nome = nome;
-    if(ingredientes) receitaEditada.ingredientes = ingredientes;
-    if(descricao) receitaEditada.descricao = descricao;
+    const receitaSchema = joi.object({
+        nome: joi.string(),
+        ingredientes: joi.string(),
+        descricao: joi.string()
+    })
+
+    const validation = receitaSchema.validate(request.body, {abortEarly: false});
+
+    if(validation.error) return response.status(422).send(validation.error.details);
 
     try{
         const result = await db.collection("receitas").updateOne(
             { _id: new ObjectId(id) },
-            { $set: receitaEditada}
+            { $set: request.body}
         )
         if(result.matchedCount === 0) response.status(404).send("esse item não existe")
         response.send("receita atualizada")
@@ -119,15 +128,20 @@ app.put("/receitas/muitas/:filtroIngredientes", async (request, response) => {
     const {filtroIngredientes} = request.params;
     const {nome, ingredientes, descricao} = request.body;
 
-    const receitaEditada = {}
-    if(nome) receitaEditada.nome = nome;
-    if(ingredientes) receitaEditada.ingredientes = ingredientes;
-    if(descricao) receitaEditada.descricao = descricao;
+    const receitaSchema = joi.object({
+        nome: joi.string(),
+        ingredientes: joi.string(),
+        descricao: joi.string()
+    })
+
+    const validation = receitaSchema.validate(request.body, {abortEarly: false});
+
+    if(validation.error) return response.status(422).send(validation.error.details);
 
     try{
         const result = await db.collection("receitas").updateMany(
             {ingredientes: {$regex: filtroIngredientes, $options: "i"}},
-            {$set: receitaEditada}
+            {$set: request.body}
         )
 
         if(result.matchedCount === 0) return response.status(404).send("deu ruim")
