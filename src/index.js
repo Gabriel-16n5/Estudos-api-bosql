@@ -3,6 +3,7 @@ import cors from "cors";
 import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv"
 import joi from "joi"
+import bcrypt from "bcrypt"
 
 const app = express() // Criação do app do server
 
@@ -20,6 +21,14 @@ const mongoCLient = new MongoClient(process.env.DATABASE_URL)
         console.log(erro.message)
     }
 const db = mongoCLient.db();
+
+//schmas
+
+const userSchema = joi.object({
+    nome: joi.string().required(),
+    email: joi.string().email().required(),
+    senha: joi.string().required()
+})
 
 
 // end points da aplicação
@@ -141,7 +150,7 @@ app.put("/receitas/muitas/:filtroIngredientes", async (request, response) => {
     try{
         const result = await db.collection("receitas").updateMany(
             {ingredientes: {$regex: filtroIngredientes, $options: "i"}},
-            {$set: request.body}
+            {$set: request}
         )
 
         if(result.matchedCount === 0) return response.status(404).send("deu ruim")
@@ -152,5 +161,39 @@ app.put("/receitas/muitas/:filtroIngredientes", async (request, response) => {
         response.status(500).send(erro.message)
     }
 })
+
+    app.post("/sign-up", async (req, res) => {
+        const {nome, email, senha} = req.body;
+
+        const validation = userSchema.validate(req.body, {abortEarly: false});
+        if(validation.error) return res.status(422).send(validation.error.details);
+
+        const hash = (bcrypt.hashSync(senha, 10))
+
+        try{
+            const userEmail = await db.collection("users").findOne({email});
+            if(userEmail) return res.status(401).send("email já cadastrado");
+            await db.collection("users").insertOne({nome, email, senha: hash})
+            res.sendStatus(201);
+        } catch(erro) {
+            response.status(500).send(erro.message)
+        }
+    })
+
+    app.post("/sign-in", async (req, res) => {
+        const {email, senha} = req.body;
+
+        try{
+            const holder = await db.collection("users").findOne({email})
+            if(!holder) return res.status(401).send("email não cadastrado");
+
+            const passCompare = bcrypt.compareSync(senha, holder.senha);
+            if(!passCompare) return res.status(401).send("senha incorreta");
+
+            res.sendStatus(200)
+        } catch(erro) {
+            response.status(500).send(erro.message)
+        }
+    })
 
 app.listen(4000, () => console.log("Ta rodando")) // normalmente não é porta fixa, geralmente de 3000 a 5999
