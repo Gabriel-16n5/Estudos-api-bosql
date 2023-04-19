@@ -116,8 +116,10 @@ app.delete("/receitas/muitas/:filtroIngredientes", async (request, response) => 
 app.put("/receitas/:id", async (request, response) => {
     const {id} = request.params;
     const {nome, ingredientes, descricao} = request.body;
-    const {authorization} = request.headers;
+    const { authorization } = request.headers;
     const token = authorization?.replace("Bearer ", "")
+
+    if(!token) return response.status(401).send("Não veio token")
 
     const receitaSchema = joi.object({
         nome: joi.string(),
@@ -131,11 +133,13 @@ app.put("/receitas/:id", async (request, response) => {
 
     try{
         const session = await db.collection("sessions").findOne({token});
-        if(!session) return response.sendStatus(401)
+        if(!session) return response.status(401).send("token inválido")
 
         const receita = await db.collection("receitas").findOne({ _id: new ObjectId(id) });
         if(!receita) return res.sendStatus(404);
-        if(receita.idUser.equals(session.idUser)) return response.sendStatus(401)
+        console.log(receita)
+        console.log(session)
+        if(!receita.idUser.equals(session.idUser)) return response.status(401).send("credenciais não batem")
 
         const result = await db.collection("receitas").updateOne(
             { _id: new ObjectId(id) },
@@ -198,7 +202,8 @@ app.put("/receitas/muitas/:filtroIngredientes", async (request, response) => {
 
     app.post("/sign-in", async (req, res) => {
         const {email, senha} = req.body;
-
+        console.log(email);
+        console.log(senha)
         try{
             const user = await db.collection("users").findOne({email})
             if(!user) return res.status(401).send("email não cadastrado");
