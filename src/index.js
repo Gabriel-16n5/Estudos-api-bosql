@@ -4,6 +4,7 @@ import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv"
 import joi from "joi"
 import bcrypt from "bcrypt"
+import {v4 as uuid} from "uuid"
 
 const app = express() // Criação do app do server
 
@@ -58,6 +59,10 @@ app.get("/receitas/:id", async (request, response) => {
 
 app.post("/receitas", async (request, response) => {
     const {nome, ingredientes, descricao} = request.body;
+    const {authorization} = request.headers;
+    const token = authorization?.replace("Bearer ", "") // essa interrogação é um operational chaining, que serve para validar um dado antes se ele é true
+    console.log(token)
+    if(!token) return response.sendStatus(401);
     
     const receitaSchema = joi.object({
         nome: joi.string().required(),
@@ -70,10 +75,12 @@ app.post("/receitas", async (request, response) => {
     if(validation.error) return response.status(422).send(validation.error.details);
 
     try{
+        const session = await db.collection("sessions").findOne({token});
+        if(!session) return response.sendStatus(401)
         const recipe = await db.collection("receitas").findOne({nome: nome})
         if(recipe) return response.status(409).send("receita já existente")
 
-        await db.collection("receitas").insertOne(request.body)
+        await db.collection("receitas").insertOne({...request.body, idUser: session.idUser})
         response.status(201).send("Receita criada com sucesso")
     } catch (erro) {
         response.status(500).send(erro.message)
@@ -109,6 +116,8 @@ app.delete("/receitas/muitas/:filtroIngredientes", async (request, response) => 
 app.put("/receitas/:id", async (request, response) => {
     const {id} = request.params;
     const {nome, ingredientes, descricao} = request.body;
+    const {authorization} = request.headers;
+    const token = authorization?.replace("Bearer ", "")
 
     const receitaSchema = joi.object({
         nome: joi.string(),
@@ -121,6 +130,13 @@ app.put("/receitas/:id", async (request, response) => {
     if(validation.error) return response.status(422).send(validation.error.details);
 
     try{
+        const session = await db.collection("sessions").findOne({token});
+        if(!session) return response.sendStatus(401)
+
+        const receita = await db.collection("receitas").findOne({ _id: new ObjectId(id) });
+        if(!receita) return res.sendStatus(404);
+        if(receita.idUser.equals(session.idUser)) return response.sendStatus(401)
+
         const result = await db.collection("receitas").updateOne(
             { _id: new ObjectId(id) },
             { $set: request.body}
@@ -129,7 +145,7 @@ app.put("/receitas/:id", async (request, response) => {
         response.send("receita atualizada")
     }
     catch (erro) {
-        response.status(500).send("deu ruim")
+        response.status(500).send(erro.message)
     }
 })
 
@@ -184,13 +200,14 @@ app.put("/receitas/muitas/:filtroIngredientes", async (request, response) => {
         const {email, senha} = req.body;
 
         try{
-            const holder = await db.collection("users").findOne({email})
-            if(!holder) return res.status(401).send("email não cadastrado");
+            const user = await db.collection("users").findOne({email})
+            if(!user) return res.status(401).send("email não cadastrado");
 
-            const passCompare = bcrypt.compareSync(senha, holder.senha);
+            const passCompare = bcrypt.compareSync(senha, user.senha);
             if(!passCompare) return res.status(401).send("senha incorreta");
-
-            res.sendStatus(200)
+            const token = uuid()
+            await db.collection("sessions").insertOne({token, idUser: user._id})
+            res.send(token)
         } catch(erro) {
             response.status(500).send(erro.message)
         }
